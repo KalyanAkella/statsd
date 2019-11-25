@@ -168,22 +168,6 @@ type tag struct {
 	K, V string
 }
 
-func joinTags(tf TagFormat, tags []tag) string {
-	if len(tags) == 0 || tf == 0 {
-		return ""
-	}
-	join := joinFuncs[tf]
-	return join(tags)
-}
-
-func splitTags(tf TagFormat, tags string) []tag {
-	if len(tags) == 0 || tf == 0 {
-		return nil
-	}
-	split := splitFuncs[tf]
-	return split(tags)
-}
-
 const (
 	// InfluxDB tag format.
 	// See https://influxdb.com/blog/2015/11/03/getting_started_with_influx_statsd.html
@@ -193,58 +177,63 @@ const (
 	Datadog
 )
 
-var (
-	joinFuncs = map[TagFormat]func([]tag) string{
-		// InfluxDB tag format: ,tag1=payroll,region=us-west
-		// https://influxdb.com/blog/2015/11/03/getting_started_with_influx_statsd.html
-		InfluxDB: func(tags []tag) string {
-			var buf bytes.Buffer
-			for _, tag := range tags {
+func (tf TagFormat) join(tags []tag) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	switch tf {
+	case InfluxDB:
+		var buf bytes.Buffer
+		for _, tag := range tags {
+			_ = buf.WriteByte(',')
+			_, _ = buf.WriteString(tag.K)
+			_ = buf.WriteByte('=')
+			_, _ = buf.WriteString(tag.V)
+		}
+		return buf.String()
+	case Datadog:
+		buf := bytes.NewBufferString("|#")
+		first := true
+		for _, tag := range tags {
+			if first {
+				first = false
+			} else {
 				_ = buf.WriteByte(',')
-				_, _ = buf.WriteString(tag.K)
-				_ = buf.WriteByte('=')
-				_, _ = buf.WriteString(tag.V)
 			}
-			return buf.String()
-		},
-		// Datadog tag format: |#tag1:value1,tag2:value2
-		// http://docs.datadoghq.com/guides/dogstatsd/#datagram-format
-		Datadog: func(tags []tag) string {
-			buf := bytes.NewBufferString("|#")
-			first := true
-			for _, tag := range tags {
-				if first {
-					first = false
-				} else {
-					_ = buf.WriteByte(',')
-				}
-				_, _ = buf.WriteString(tag.K)
-				_ = buf.WriteByte(':')
-				_, _ = buf.WriteString(tag.V)
-			}
-			return buf.String()
-		},
+			_, _ = buf.WriteString(tag.K)
+			_ = buf.WriteByte(':')
+			_, _ = buf.WriteString(tag.V)
+		}
+		return buf.String()
+	default:
+		return ""
 	}
-	splitFuncs = map[TagFormat]func(string) []tag{
-		InfluxDB: func(s string) []tag {
-			s = s[1:]
-			pairs := strings.Split(s, ",")
-			tags := make([]tag, len(pairs))
-			for i, pair := range pairs {
-				kv := strings.Split(pair, "=")
-				tags[i] = tag{K: kv[0], V: kv[1]}
-			}
-			return tags
-		},
-		Datadog: func(s string) []tag {
-			s = s[2:]
-			pairs := strings.Split(s, ",")
-			tags := make([]tag, len(pairs))
-			for i, pair := range pairs {
-				kv := strings.Split(pair, ":")
-				tags[i] = tag{K: kv[0], V: kv[1]}
-			}
-			return tags
-		},
+}
+
+func (tf TagFormat) split(s string) []tag {
+	if len(s) == 0 {
+		return nil
 	}
-)
+	switch tf {
+	case InfluxDB:
+		s = s[1:]
+		pairs := strings.Split(s, ",")
+		tags := make([]tag, len(pairs))
+		for i, pair := range pairs {
+			kv := strings.Split(pair, "=")
+			tags[i] = tag{K: kv[0], V: kv[1]}
+		}
+		return tags
+	case Datadog:
+		s = s[2:]
+		pairs := strings.Split(s, ",")
+		tags := make([]tag, len(pairs))
+		for i, pair := range pairs {
+			kv := strings.Split(pair, ":")
+			tags[i] = tag{K: kv[0], V: kv[1]}
+		}
+		return tags
+	default:
+		return nil
+	}
+}

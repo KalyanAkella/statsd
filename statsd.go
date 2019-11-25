@@ -42,7 +42,7 @@ func New(opts ...Option) (*Client, error) {
 	}
 	c.rate = conf.Client.Rate
 	c.prefix = conf.Client.Prefix
-	c.tags = joinTags(conf.Conn.TagFormat, conf.Client.Tags)
+	c.tags = conf.Conn.TagFormat.join(conf.Client.Tags)
 	return c, nil
 }
 
@@ -57,7 +57,7 @@ func (c *Client) Clone(opts ...Option) *Client {
 		Client: clientConfig{
 			Rate:   c.rate,
 			Prefix: c.prefix,
-			Tags:   splitTags(tf, c.tags),
+			Tags:   tf.split(c.tags),
 		},
 	}
 	for _, o := range opts {
@@ -69,7 +69,7 @@ func (c *Client) Clone(opts ...Option) *Client {
 		muted:  c.muted || conf.Client.Muted,
 		rate:   conf.Client.Rate,
 		prefix: conf.Client.Prefix,
-		tags:   joinTags(tf, conf.Client.Tags),
+		tags:   tf.join(conf.Client.Tags),
 	}
 	clone.conn = c.conn
 	return clone
