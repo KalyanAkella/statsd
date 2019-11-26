@@ -4,11 +4,12 @@ import "time"
 
 // A Client represents a StatsD client.
 type Client struct {
-	conn   *conn
-	muted  bool
-	rate   float32
-	prefix string
-	tags   string
+	conn      *conn
+	muted     bool
+	rate      float32
+	prefix    string
+	tags      []tag
+	tagFormat TagFormat
 }
 
 // New returns a new Client.
@@ -42,7 +43,8 @@ func New(opts ...Option) (*Client, error) {
 	}
 	c.rate = conf.Client.Rate
 	c.prefix = conf.Client.Prefix
-	c.tags = conf.Conn.TagFormat.join(conf.Client.Tags)
+	c.tags = conf.Client.Tags
+	c.tagFormat = conf.Conn.TagFormat
 	return c, nil
 }
 
@@ -57,7 +59,7 @@ func (c *Client) Clone(opts ...Option) *Client {
 		Client: clientConfig{
 			Rate:   c.rate,
 			Prefix: c.prefix,
-			Tags:   tf.split(c.tags),
+			Tags:   c.tags,
 		},
 	}
 	for _, o := range opts {
@@ -65,11 +67,12 @@ func (c *Client) Clone(opts ...Option) *Client {
 	}
 
 	clone := &Client{
-		conn:   c.conn,
-		muted:  c.muted || conf.Client.Muted,
-		rate:   conf.Client.Rate,
-		prefix: conf.Client.Prefix,
-		tags:   tf.join(conf.Client.Tags),
+		conn:      c.conn,
+		muted:     c.muted || conf.Client.Muted,
+		rate:      conf.Client.Rate,
+		prefix:    conf.Client.Prefix,
+		tags:      conf.Client.Tags,
+		tagFormat: tf,
 	}
 	clone.conn = c.conn
 	return clone
@@ -80,7 +83,7 @@ func (c *Client) Count(bucket string, n interface{}) {
 	if c.skip() {
 		return
 	}
-	c.conn.metric(c.prefix, bucket, n, "c", c.rate, c.tags)
+	c.conn.metric(c.prefix, bucket, n, "c", c.rate, c.tagFormat.join(c.tags))
 }
 
 func (c *Client) skip() bool {
@@ -93,11 +96,12 @@ func (c *Client) Increment(bucket string) {
 }
 
 // Gauge records an absolute value for the given bucket.
-func (c *Client) Gauge(bucket string, value interface{}) {
+func (c *Client) Gauge(bucket string, value interface{}, metricTags ...string) {
 	if c.skip() {
 		return
 	}
-	c.conn.gauge(c.prefix, bucket, value, c.tags)
+
+	c.conn.gauge(c.prefix, bucket, value, c.tagFormat.join(c.tags))
 }
 
 // Timing sends a timing value to a bucket.
@@ -105,7 +109,7 @@ func (c *Client) Timing(bucket string, value interface{}) {
 	if c.skip() {
 		return
 	}
-	c.conn.metric(c.prefix, bucket, value, "ms", c.rate, c.tags)
+	c.conn.metric(c.prefix, bucket, value, "ms", c.rate, c.tagFormat.join(c.tags))
 }
 
 // Histogram sends an histogram value to a bucket.
@@ -113,7 +117,7 @@ func (c *Client) Histogram(bucket string, value interface{}) {
 	if c.skip() {
 		return
 	}
-	c.conn.metric(c.prefix, bucket, value, "h", c.rate, c.tags)
+	c.conn.metric(c.prefix, bucket, value, "h", c.rate, c.tagFormat.join(c.tags))
 }
 
 // A Timing is an helper object that eases sending timing values.
@@ -142,7 +146,7 @@ func (c *Client) Unique(bucket string, value string) {
 	if c.skip() {
 		return
 	}
-	c.conn.unique(c.prefix, bucket, value, c.tags)
+	c.conn.unique(c.prefix, bucket, value, c.tagFormat.join(c.tags))
 }
 
 // Flush flushes the Client's buffer.

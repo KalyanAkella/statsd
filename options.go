@@ -141,11 +141,7 @@ func Tags(tags ...string) Option {
 			return
 		}
 
-		newTags := make([]tag, len(tags)/2)
-		for i := 0; i < len(tags)/2; i++ {
-			newTags[i] = tag{K: tags[2*i], V: tags[2*i+1]}
-		}
-
+		newTags := asTags(tags...)
 		for _, newTag := range newTags {
 			exists := false
 			for _, oldTag := range c.Client.Tags {
@@ -162,6 +158,23 @@ func Tags(tags ...string) Option {
 			}
 		}
 	})
+}
+
+func asTags(tags ...string) []tag {
+	if len(tags)%2 != 0 {
+		panic("statsd: Tags only accepts an even number of arguments")
+	}
+
+	if len(tags) == 0 {
+		return nil
+	}
+
+	newTags := make([]tag, len(tags)/2)
+	for i := 0; i < len(tags)/2; i++ {
+		newTags[i] = tag{K: tags[2*i], V: tags[2*i+1]}
+	}
+
+	return newTags
 }
 
 type tag struct {
@@ -193,11 +206,8 @@ func (tf TagFormat) join(tags []tag) string {
 		return buf.String()
 	case Datadog:
 		buf := bytes.NewBufferString("|#")
-		first := true
-		for _, tag := range tags {
-			if first {
-				first = false
-			} else {
+		for i, tag := range tags {
+			if i > 0 {
 				_ = buf.WriteByte(',')
 			}
 			_, _ = buf.WriteString(tag.K)
