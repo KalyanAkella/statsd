@@ -123,15 +123,15 @@ func TagsFormat(tf TagFormat) Option {
 	})
 }
 
-// Tags appends the given tags to the tags sent with every metrics. If a tag
+// CommonTags appends the given tags to the tags sent with every metrics. If a tag
 // already exists, it is replaced.
 //
 // The tags must be set as key-value pairs. If the number of tags is not even,
-// Tags panics.
+// CommonTags panics.
 //
 // If the format of tags have not been set using the TagsFormat option, the tags
 // will be ignored.
-func Tags(tags ...string) Option {
+func CommonTags(tags ...string) Option {
 	if len(tags)%2 != 0 {
 		panic("statsd: Tags only accepts an even number of arguments")
 	}

@@ -164,25 +164,25 @@ func TestPrefix(t *testing.T) {
 func TestNilTags(t *testing.T) {
 	testOutput(t, "test_key:1|c", func(c *Client) {
 		c.Increment(testKey)
-	}, TagsFormat(InfluxDB), Tags())
+	}, TagsFormat(InfluxDB), CommonTags())
 }
 
 func TestInfluxDBTags(t *testing.T) {
 	testOutput(t, "test_key,tag1=value1,tag2=value2:1|c", func(c *Client) {
 		c.Increment(testKey)
-	}, TagsFormat(InfluxDB), Tags("tag1", "value1", "tag2", "value2"))
+	}, TagsFormat(InfluxDB), CommonTags("tag1", "value1", "tag2", "value2"))
 }
 
 func TestDatadogTags(t *testing.T) {
 	testOutput(t, "test_key:1|c|#tag1:value1,tag2:value2", func(c *Client) {
 		c.Increment(testKey)
-	}, TagsFormat(Datadog), Tags("tag1", "value1", "tag2", "value2"))
+	}, TagsFormat(Datadog), CommonTags("tag1", "value1", "tag2", "value2"))
 }
 
 func TestNoTagFormat(t *testing.T) {
 	testOutput(t, "test_key:1|c", func(c *Client) {
 		c.Increment(testKey)
-	}, Tags("tag1", "value1", "tag2", "value2"))
+	}, CommonTags("tag1", "value1", "tag2", "value2"))
 }
 
 func TestOddTagsArgs(t *testing.T) {
@@ -196,7 +196,7 @@ func TestOddTagsArgs(t *testing.T) {
 		}
 	}()
 
-	_, _ = New(TagsFormat(InfluxDB), Tags("tag1"))
+	_, _ = New(TagsFormat(InfluxDB), CommonTags("tag1"))
 	t.Fatal("A panic should occur")
 }
 
@@ -287,7 +287,7 @@ func TestCloneInherits(t *testing.T) {
 		TagsFormat(Datadog),
 		Prefix("app"),
 		SampleRate(0.5),
-		Tags("tag1", "value1"),
+		CommonTags("tag1", "value1"),
 	)
 }
 
@@ -318,16 +318,16 @@ func TestCloneRate(t *testing.T) {
 
 func TestCloneInfluxDBTags(t *testing.T) {
 	testOutput(t, "test_key,tag1=value1,tag2=value2:5|c", func(c *Client) {
-		clone := c.Clone(Tags("tag1", "value3", "tag2", "value2"))
+		clone := c.Clone(CommonTags("tag1", "value3", "tag2", "value2"))
 		clone.Count(testKey, 5)
-	}, TagsFormat(InfluxDB), Tags("tag1", "value1"))
+	}, TagsFormat(InfluxDB), CommonTags("tag1", "value1"))
 }
 
 func TestCloneDatadogTags(t *testing.T) {
 	testOutput(t, "test_key:5|c|#tag1:value1,tag2:value2", func(c *Client) {
-		clone := c.Clone(Tags("tag1", "value3", "tag2", "value2"))
+		clone := c.Clone(CommonTags("tag1", "value3", "tag2", "value2"))
 		clone.Count(testKey, 5)
-	}, TagsFormat(Datadog), Tags("tag1", "value1"))
+	}, TagsFormat(Datadog), CommonTags("tag1", "value1"))
 }
 
 func TestDialError(t *testing.T) {

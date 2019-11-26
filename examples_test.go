@@ -111,7 +111,7 @@ func ExamplePrefix() {
 func ExampleTags() {
 	c, err = statsd.New(
 		statsd.TagsFormat(statsd.InfluxDB),
-		statsd.Tags("region", "us", "app", "my_app"),
+		statsd.CommonTags("region", "us", "app", "my_app"),
 	)
 }
 
