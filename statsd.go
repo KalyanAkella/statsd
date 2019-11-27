@@ -1,6 +1,8 @@
 package statsd
 
-import "time"
+import (
+	"time"
+)
 
 // A Client represents a StatsD client.
 type Client struct {
@@ -8,7 +10,7 @@ type Client struct {
 	muted     bool
 	rate      float32
 	prefix    string
-	tags      []tag
+	tags      *Tags
 	tagFormat TagFormat
 }
 
@@ -18,6 +20,7 @@ func New(opts ...Option) (*Client, error) {
 	conf := &config{
 		Client: clientConfig{
 			Rate: 1,
+			Tags: emptyTags(),
 		},
 		Conn: connConfig{
 			Addr:        ":8125",
@@ -71,7 +74,7 @@ func (c *Client) Clone(opts ...Option) *Client {
 		muted:     c.muted || conf.Client.Muted,
 		rate:      conf.Client.Rate,
 		prefix:    conf.Client.Prefix,
-		tags:      conf.Client.Tags,
+		tags:      conf.Client.Tags.clone(),
 		tagFormat: tf,
 	}
 	clone.conn = c.conn
@@ -83,7 +86,7 @@ func (c *Client) Count(bucket string, n interface{}) {
 	if c.skip() {
 		return
 	}
-	c.conn.metric(c.prefix, bucket, n, "c", c.rate, c.tagFormat.join(c.tags))
+	c.conn.metric(c.prefix, bucket, n, "c", c.rate, c.tags.format(c.tagFormat))
 }
 
 func (c *Client) skip() bool {
@@ -101,7 +104,7 @@ func (c *Client) Gauge(bucket string, value interface{}, metricTags ...string) {
 		return
 	}
 
-	c.conn.gauge(c.prefix, bucket, value, c.tagFormat.join(c.tags))
+	c.conn.gauge(c.prefix, bucket, value, c.tags.format(c.tagFormat))
 }
 
 // Timing sends a timing value to a bucket.
@@ -109,7 +112,7 @@ func (c *Client) Timing(bucket string, value interface{}) {
 	if c.skip() {
 		return
 	}
-	c.conn.metric(c.prefix, bucket, value, "ms", c.rate, c.tagFormat.join(c.tags))
+	c.conn.metric(c.prefix, bucket, value, "ms", c.rate, c.tags.format(c.tagFormat))
 }
 
 // Histogram sends an histogram value to a bucket.
@@ -117,7 +120,7 @@ func (c *Client) Histogram(bucket string, value interface{}) {
 	if c.skip() {
 		return
 	}
-	c.conn.metric(c.prefix, bucket, value, "h", c.rate, c.tagFormat.join(c.tags))
+	c.conn.metric(c.prefix, bucket, value, "h", c.rate, c.tags.format(c.tagFormat))
 }
 
 // A Timing is an helper object that eases sending timing values.
@@ -146,7 +149,7 @@ func (c *Client) Unique(bucket string, value string) {
 	if c.skip() {
 		return
 	}
-	c.conn.unique(c.prefix, bucket, value, c.tagFormat.join(c.tags))
+	c.conn.unique(c.prefix, bucket, value, c.tags.format(c.tagFormat))
 }
 
 // Flush flushes the Client's buffer.

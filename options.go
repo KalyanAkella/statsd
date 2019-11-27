@@ -15,7 +15,7 @@ type clientConfig struct {
 	Muted  bool
 	Rate   float32
 	Prefix string
-	Tags   []tag
+	Tags   *Tags
 }
 
 type connConfig struct {
@@ -141,44 +141,94 @@ func CommonTags(tags ...string) Option {
 			return
 		}
 
-		newTags := asTags(tags...)
-		for _, newTag := range newTags {
-			exists := false
-			for _, oldTag := range c.Client.Tags {
-				if newTag.K == oldTag.K {
-					exists = true
-					oldTag.V = newTag.V
-				}
-			}
-			if !exists {
-				c.Client.Tags = append(c.Client.Tags, tag{
-					K: newTag.K,
-					V: newTag.V,
-				})
-			}
-		}
+		newCommonTags := newTags(tags...)
+		c.Client.Tags.append(newCommonTags)
 	})
 }
 
-func asTags(tags ...string) []tag {
-	if len(tags)%2 != 0 {
-		panic("statsd: Tags only accepts an even number of arguments")
+type Tags struct {
+	kvs  map[string]string
+	keys []string
+}
+
+func emptyTags() *Tags {
+	kvs := make(map[string]string)
+	keys := make([]string, 0)
+	return &Tags{kvs, keys}
+}
+
+func newTags(tags ...string) *Tags {
+	if len(tags)&1 == 1 {
+		panic("statsd: newTags only accepts an even number of arguments")
 	}
 
 	if len(tags) == 0 {
-		return nil
+		return emptyTags()
 	}
 
-	newTags := make([]tag, len(tags)/2)
-	for i := 0; i < len(tags)/2; i++ {
-		newTags[i] = tag{K: tags[2*i], V: tags[2*i+1]}
+	numTags := len(tags) >> 1
+	tagKeys := make([]string, numTags)
+	newTags := make(map[string]string, numTags)
+	for i := 0; i < numTags; i++ {
+		k, v := tags[i<<1], tags[1+i<<1]
+		newTags[k] = v
+		tagKeys[i] = k
 	}
 
-	return newTags
+	return &Tags{newTags, tagKeys}
 }
 
-type tag struct {
-	K, V string
+func (this *Tags) append(that *Tags) {
+	for _, k := range that.keys {
+		if _, present := this.kvs[k]; !present {
+			this.kvs[k] = that.kvs[k]
+			this.keys = append(this.keys, k)
+		}
+	}
+}
+
+func (this *Tags) numTags() int {
+	return len(this.keys)
+}
+
+func (this *Tags) clone() *Tags {
+	numTags := this.numTags()
+	kvs := make(map[string]string, numTags)
+	keys := make([]string, numTags)
+	for i, k := range this.keys {
+		kvs[k] = this.kvs[k]
+		keys[i] = k
+	}
+	return &Tags{kvs, keys}
+}
+
+func (this *Tags) format(tf TagFormat) string {
+	if this.numTags() == 0 {
+		return ""
+	}
+	switch tf {
+	case InfluxDB:
+		var buf bytes.Buffer
+		for _, k := range this.keys {
+			_ = buf.WriteByte(',')
+			_, _ = buf.WriteString(k)
+			_ = buf.WriteByte('=')
+			_, _ = buf.WriteString(this.kvs[k])
+		}
+		return buf.String()
+	case Datadog:
+		buf := bytes.NewBufferString("|#")
+		for _, k := range this.keys {
+			_, _ = buf.WriteString(k)
+			_ = buf.WriteByte(':')
+			_, _ = buf.WriteString(this.kvs[k])
+			_ = buf.WriteByte(',')
+		}
+		result := buf.String()
+		return strings.TrimSuffix(result, ",")
+	default:
+		return ""
+	}
 }
 
 const (
@@ -190,60 +240,34 @@ const (
 	Datadog
 )
 
-func (tf TagFormat) join(tags []tag) string {
-	if len(tags) == 0 {
-		return ""
-	}
-	switch tf {
-	case InfluxDB:
-		var buf bytes.Buffer
-		for _, tag := range tags {
-			_ = buf.WriteByte(',')
-			_, _ = buf.WriteString(tag.K)
-			_ = buf.WriteByte('=')
-			_, _ = buf.WriteString(tag.V)
-		}
-		return buf.String()
-	case Datadog:
-		buf := bytes.NewBufferString("|#")
-		for i, tag := range tags {
-			if i > 0 {
-				_ = buf.WriteByte(',')
-			}
-			_, _ = buf.WriteString(tag.K)
-			_ = buf.WriteByte(':')
-			_, _ = buf.WriteString(tag.V)
-		}
-		return buf.String()
-	default:
-		return ""
-	}
-}
-
-func (tf TagFormat) split(s string) []tag {
+func (tf TagFormat) split(s string) *Tags {
 	if len(s) == 0 {
-		return nil
+		return emptyTags()
 	}
 	switch tf {
 	case InfluxDB:
 		s = s[1:]
 		pairs := strings.Split(s, ",")
-		tags := make([]tag, len(pairs))
+		keys := make([]string, len(pairs))
+		tags := make(map[string]string, len(pairs))
 		for i, pair := range pairs {
 			kv := strings.Split(pair, "=")
-			tags[i] = tag{K: kv[0], V: kv[1]}
+			tags[kv[0]] = kv[1]
+			keys[i] = kv[0]
 		}
-		return tags
+		return &Tags{tags, keys}
 	case Datadog:
 		s = s[2:]
 		pairs := strings.Split(s, ",")
-		tags := make([]tag, len(pairs))
+		keys := make([]string, len(pairs))
+		tags := make(map[string]string, len(pairs))
 		for i, pair := range pairs {
 			kv := strings.Split(pair, ":")
-			tags[i] = tag{K: kv[0], V: kv[1]}
+			tags[kv[0]] = kv[1]
+			keys[i] = kv[0]
 		}
-		return tags
+		return &Tags{tags, keys}
 	default:
-		return nil
+		return emptyTags()
 	}
 }
