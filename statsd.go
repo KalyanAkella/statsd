@@ -82,11 +82,14 @@ func (c *Client) Clone(opts ...Option) *Client {
 }
 
 // Count adds n to bucket.
-func (c *Client) Count(bucket string, n interface{}) {
+func (c *Client) Count(bucket string, n interface{}, metricTags ...string) {
 	if c.skip() {
 		return
 	}
-	c.conn.metric(c.prefix, bucket, n, "c", c.rate, c.tags.format(c.tagFormat))
+
+	mTags := newTags(metricTags...)
+	mTags.append(c.tags)
+	c.conn.metric(c.prefix, bucket, n, "c", c.rate, mTags.format(c.tagFormat))
 }
 
 func (c *Client) skip() bool {
@@ -94,8 +97,8 @@ func (c *Client) skip() bool {
 }
 
 // Increment increment the given bucket. It is equivalent to Count(bucket, 1).
-func (c *Client) Increment(bucket string) {
-	c.Count(bucket, 1)
+func (c *Client) Increment(bucket string, metricTags ...string) {
+	c.Count(bucket, 1, metricTags...)
 }
 
 // Gauge records an absolute value for the given bucket.
@@ -104,7 +107,9 @@ func (c *Client) Gauge(bucket string, value interface{}, metricTags ...string) {
 		return
 	}
 
-	c.conn.gauge(c.prefix, bucket, value, c.tags.format(c.tagFormat))
+	mTags := newTags(metricTags...)
+	mTags.append(c.tags)
+	c.conn.gauge(c.prefix, bucket, value, mTags.format(c.tagFormat))
 }
 
 // Timing sends a timing value to a bucket.
@@ -116,11 +121,14 @@ func (c *Client) Timing(bucket string, value interface{}) {
 }
 
 // Histogram sends an histogram value to a bucket.
-func (c *Client) Histogram(bucket string, value interface{}) {
+func (c *Client) Histogram(bucket string, value interface{}, metricTags ...string) {
 	if c.skip() {
 		return
 	}
-	c.conn.metric(c.prefix, bucket, value, "h", c.rate, c.tags.format(c.tagFormat))
+
+	mTags := newTags(metricTags...)
+	mTags.append(c.tags)
+	c.conn.metric(c.prefix, bucket, value, "h", c.rate, mTags.format(c.tagFormat))
 }
 
 // A Timing is an helper object that eases sending timing values.

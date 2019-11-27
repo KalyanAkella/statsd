@@ -30,11 +30,39 @@ func TestIncrement(t *testing.T) {
 	})
 }
 
+func TestIncrementWithInfluxDBTags(t *testing.T) {
+	testOutput(t, "test_key,tag3=value3,tag1=value1,tag2=value2:1|c\ntest_key,tag3=value4,tag1=value1,tag2=value2:1|c", func(c *Client) {
+		c.Increment(testKey, "tag3", "value3")
+		c.Increment(testKey, "tag3", "value4")
+	}, TagsFormat(InfluxDB), CommonTags("tag1", "value1", "tag2", "value2"))
+}
+
+func TestIncrementWithDatadogTags(t *testing.T) {
+	testOutput(t, "test_key:1|c|#tag3:value3,tag1:value1,tag2:value2\ntest_key:1|c|#tag3:value4,tag1:value1,tag2:value2", func(c *Client) {
+		c.Increment(testKey, "tag3", "value3")
+		c.Increment(testKey, "tag3", "value4")
+	}, TagsFormat(Datadog), CommonTags("tag1", "value1", "tag2", "value2"))
+}
+
 func TestGauge(t *testing.T) {
 	testOutput(t, "test_key:5|g\ntest_key:0|g\ntest_key:-10|g", func(c *Client) {
 		c.Gauge(testKey, 5)
 		c.Gauge(testKey, -10)
 	})
+}
+
+func TestGaugeWithInfluxDBTags(t *testing.T) {
+	testOutput(t, "test_key,tag3=value3,tag1=value1,tag2=value2:5|g\ntest_key,tag3=value4,tag1=value1,tag2=value2:10|g", func(c *Client) {
+		c.Gauge(testKey, 5, "tag3", "value3")
+		c.Gauge(testKey, 10, "tag3", "value4")
+	}, TagsFormat(InfluxDB), CommonTags("tag1", "value1", "tag2", "value2"))
+}
+
+func TestGaugeWithDatadogTags(t *testing.T) {
+	testOutput(t, "test_key:5|g|#tag3:value3,tag1:value1,tag2:value2\ntest_key:10|g|#tag3:value4,tag1:value1,tag2:value2", func(c *Client) {
+		c.Gauge(testKey, 5, "tag3", "value3")
+		c.Gauge(testKey, 10, "tag3", "value4")
+	}, TagsFormat(Datadog), CommonTags("tag1", "value1", "tag2", "value2"))
 }
 
 func TestTiming(t *testing.T) {
@@ -47,6 +75,20 @@ func TestHistogram(t *testing.T) {
 	testOutput(t, "test_key:17|h", func(c *Client) {
 		c.Histogram(testKey, 17)
 	})
+}
+
+func TestHistogramWithInfluxDBTags(t *testing.T) {
+	testOutput(t, "test_key,tag3=value3,tag1=value1,tag2=value2:5|h\ntest_key,tag3=value4,tag1=value1,tag2=value2:10|h", func(c *Client) {
+		c.Histogram(testKey, 5, "tag3", "value3")
+		c.Histogram(testKey, 10, "tag3", "value4")
+	}, TagsFormat(InfluxDB), CommonTags("tag1", "value1", "tag2", "value2"))
+}
+
+func TestHistogramWithDatadogTags(t *testing.T) {
+	testOutput(t, "test_key:5|h|#tag3:value3,tag1:value1,tag2:value2\ntest_key:10|h|#tag3:value4,tag1:value1,tag2:value2", func(c *Client) {
+		c.Histogram(testKey, 5, "tag3", "value3")
+		c.Histogram(testKey, 10, "tag3", "value4")
+	}, TagsFormat(Datadog), CommonTags("tag1", "value1", "tag2", "value2"))
 }
 
 func TestNumbers(t *testing.T) {
